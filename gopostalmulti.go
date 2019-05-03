@@ -1,40 +1,38 @@
 package gopostalmulti
 
 import (
-	"encoding/gob"
 	"log"
 	"os/exec"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/dc0d/tinykv"
-
 	postal "github.com/openvenues/gopostal/parser"
+	"github.com/vmihailenco/msgpack"
 )
 
 var pool = sync.Pool{
 	New: func() interface{} {
 		return request{
-			resp: make(chan []postal.ParsedComponent, 1),
+			resp: make(chan []string, 2),
 		}
 	},
 }
 
-var kv = tinykv.New(time.Minute, nil)
+// var kv = tinykv.New(time.Minute, nil)
 
 var requestChan = make(chan request, 100)
 
 type request struct {
 	address string
-	resp    chan []postal.ParsedComponent
+	resp    chan []string
 }
 
 var count = 0
 
 var mu sync.Mutex
 
-var path = "gopostalmulticmd"
+var path = "gopostalmultic"
 
 // start a new underlying OS process of "path" to process locations
 func startOne() {
@@ -59,18 +57,24 @@ func startOne() {
 	}
 
 	go func() {
-		encoder := gob.NewEncoder(writer)
-		decoder := gob.NewDecoder(reader)
+		decoder := msgpack.NewDecoder(reader)
 		for {
 			select {
 			case req := <-requestChan:
-				encoder.Encode(req.address)
-				out := []postal.ParsedComponent{}
-				err := decoder.Decode(&out)
+				writer.Write([]byte(req.address))
+				writer.Write([]byte{'\n'})
+				headers := []string{}
+				values := []string{}
+				err := decoder.Decode(&headers)
 				if err != nil {
-					log.Fatalf("Error decoding address result - %v", err)
+					log.Fatalf("Error decoding address headers - %#v", err)
 				}
-				req.resp <- out
+				req.resp <- headers
+				err = decoder.Decode(&values)
+				if err != nil {
+					log.Fatalf("Error decoding address values - %#v", err)
+				}
+				req.resp <- values
 			case <-time.After(time.Millisecond * 100):
 				writer.Close()
 				reader.Close()
@@ -88,27 +92,35 @@ func init() { // serve one thread that is "native" through cgo
 	go func() {
 		for req := range requestChan {
 			resp := postal.ParseAddress(req.address)
-			req.resp <- resp
+			headers := []string{}
+			values := []string{}
+			for x := range resp {
+				headers = append(headers, resp[x].Label)
+				values = append(values, resp[x].Value)
+			}
+			req.resp <- headers
+			req.resp <- values
 		}
 	}()
 }
 
 // Parse will parse addresses and return postal components
 // can be called concurrently
-func Parse(address string) []postal.ParsedComponent {
-	resp, ok := kv.Get(address)
-	if ok {
-		return resp.([]postal.ParsedComponent)
-	}
+func Parse(address string) [][]string {
+	// resp, ok := kv.Get(address)
+	// if ok {
+	// 	return resp.([][2]string)
+	// }
 	req := pool.Get().(request)
 	defer pool.Put(req)
 	req.address = address
 	start := time.Now()
 	requestChan <- req
-	newresp := <-req.resp
-	kv.Put(address, newresp)
+	headers := <-req.resp
+	values := <-req.resp
+	// kv.Put(address, newresp)
 	if time.Since(start) > time.Millisecond {
 		startOne()
 	}
-	return newresp
+	return [][]string{headers, values}
 }

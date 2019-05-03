@@ -67,11 +67,3 @@ func BenchmarkParse5000(b *testing.B) {
 func BenchmarkParse50000(b *testing.B) {
 	benchmarkParse(50000, b)
 }
-
-func BenchmarkParse500000(b *testing.B) {
-	benchmarkParse(500000, b)
-}
-
-func BenchmarkParse5000000(b *testing.B) {
-	benchmarkParse(5000000, b)
-}
