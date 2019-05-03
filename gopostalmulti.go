@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dc0d/tinykv"
@@ -31,11 +30,20 @@ type request struct {
 	resp    chan []postal.ParsedComponent
 }
 
-var count = uint32(0)
+var count = 0
+
+var mu sync.Mutex
 
 var path = "gopostalmulticmd"
 
+// start a new underlying OS process of "path" to process locations
 func startOne() {
+	mu.Lock()
+	defer mu.Unlock()
+	if count >= runtime.NumCPU()/2 { // main thread has to produce work and cgo libpostal thread is working too
+		return // can't start any more, not helpful
+	}
+	count++
 	cmd := exec.Command(path)
 	writer, err := cmd.StdinPipe()
 	if err != nil {
@@ -63,11 +71,13 @@ func startOne() {
 					log.Fatalf("Error decoding address result - %v", err)
 				}
 				req.resp <- out
-			case <-time.After(time.Minute):
-				atomic.AddUint32(&count, ^uint32(0))
+			case <-time.After(time.Millisecond * 100):
 				writer.Close()
 				reader.Close()
 				cmd.Process.Kill()
+				mu.Lock()
+				count--
+				mu.Unlock()
 				return
 			}
 		}
@@ -98,15 +108,7 @@ func Parse(address string) []postal.ParsedComponent {
 	newresp := <-req.resp
 	kv.Put(address, newresp)
 	if time.Since(start) > time.Millisecond {
-		cnt := atomic.LoadUint32(&count)
-		if cnt < uint32(runtime.NumCPU())-2 { // main thread has to produce work and cgo libpostal thread is working too
-			cnt = atomic.AddUint32(&count, 1)
-			if cnt < uint32(runtime.NumCPU())-2 {
-				startOne()
-			} else {
-				atomic.AddUint32(&count, ^uint32(0))
-			}
-		}
+		startOne()
 	}
 	return newresp
 }
