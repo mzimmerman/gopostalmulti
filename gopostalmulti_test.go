@@ -1,12 +1,13 @@
 package gopostalmulti
 
 import (
+	"log"
 	"runtime"
 	"testing"
 )
 
 func TestParse(t *testing.T) {
-	Parse("1265 East Fort Union Blvd., suite 250, Cotton Wood Hights, Utah 84047")
+	log.Printf("%v", Parse("1265 East Fort Union Blvd., suite 250, Cotton Wood Hights, Utah 84047"))
 }
 
 var addresses = []string{

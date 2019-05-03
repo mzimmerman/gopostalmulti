@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dc0d/tinykv"
 	postal "github.com/openvenues/gopostal/parser"
 	"github.com/vmihailenco/msgpack"
 )
@@ -14,18 +15,18 @@ import (
 var pool = sync.Pool{
 	New: func() interface{} {
 		return request{
-			resp: make(chan []string, 2),
+			resp: make(chan [][2]string, 1),
 		}
 	},
 }
 
-// var kv = tinykv.New(time.Minute, nil)
+var kv = tinykv.New(time.Minute, nil)
 
 var requestChan = make(chan request, 100)
 
 type request struct {
 	address string
-	resp    chan []string
+	resp    chan [][2]string
 }
 
 var count = 0
@@ -63,18 +64,12 @@ func startOne() {
 			case req := <-requestChan:
 				writer.Write([]byte(req.address))
 				writer.Write([]byte{'\n'})
-				headers := []string{}
-				values := []string{}
-				err := decoder.Decode(&headers)
+				out := [][2]string{}
+				err := decoder.Decode(&out)
 				if err != nil {
-					log.Fatalf("Error decoding address headers - %#v", err)
+					log.Fatalf("Error decoding address - %#v", err)
 				}
-				req.resp <- headers
-				err = decoder.Decode(&values)
-				if err != nil {
-					log.Fatalf("Error decoding address values - %#v", err)
-				}
-				req.resp <- values
+				req.resp <- out
 			case <-time.After(time.Millisecond * 100):
 				writer.Close()
 				reader.Close()
@@ -92,35 +87,31 @@ func init() { // serve one thread that is "native" through cgo
 	go func() {
 		for req := range requestChan {
 			resp := postal.ParseAddress(req.address)
-			headers := []string{}
-			values := []string{}
+			out := [][2]string{}
 			for x := range resp {
-				headers = append(headers, resp[x].Label)
-				values = append(values, resp[x].Value)
+				out = append(out, [2]string{resp[x].Label, resp[x].Value})
 			}
-			req.resp <- headers
-			req.resp <- values
+			req.resp <- out
 		}
 	}()
 }
 
 // Parse will parse addresses and return postal components
 // can be called concurrently
-func Parse(address string) [][]string {
-	// resp, ok := kv.Get(address)
-	// if ok {
-	// 	return resp.([][2]string)
-	// }
+func Parse(address string) [][2]string {
+	resp, ok := kv.Get(address)
+	if ok {
+		return resp.([][2]string)
+	}
 	req := pool.Get().(request)
 	defer pool.Put(req)
 	req.address = address
 	start := time.Now()
 	requestChan <- req
-	headers := <-req.resp
-	values := <-req.resp
-	// kv.Put(address, newresp)
+	newresp := <-req.resp
+	kv.Put(address, newresp)
 	if time.Since(start) > time.Millisecond {
 		startOne()
 	}
-	return [][]string{headers, values}
+	return newresp
 }
