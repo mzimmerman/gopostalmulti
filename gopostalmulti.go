@@ -87,7 +87,7 @@ func init() { // serve one thread that is "native" through cgo
 	go func() {
 		for req := range requestChan {
 			resp := postal.ParseAddress(req.address)
-			out := [][2]string{}
+			out := make([][2]string, 0, len(resp))
 			for x := range resp {
 				out = append(out, [2]string{resp[x].Label, resp[x].Value})
 			}

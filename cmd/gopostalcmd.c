@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
         // Free responses
 	    libpostal_address_parser_response_destroy(parsed);
         fwrite(mpbuffer->data,mpbuffer->size, 1, stdout);
+        fflush(stdout);
     }
     msgpack_sbuffer_destroy(mpbuffer);
     return 0;
