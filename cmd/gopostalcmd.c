@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
 
         // Free responses
 	    libpostal_address_parser_response_destroy(parsed);
-        write(1, mpbuffer->data);
+        fwrite(mpbuffer->data,mpbuffer->size, 1, stdout);
     }
     msgpack_sbuffer_destroy(mpbuffer);
     return 0;
