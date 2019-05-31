@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
         msgpack_packer* pk = msgpack_packer_new(mpbuffer, msgpack_sbuffer_write);
 
     while (true) {
-        if (getline(&lpbuffer,&lpbufsize,stdin) <= 0) return 0; // EOF
+        if (getline(&lpbuffer,&lpbufsize,stdin) <= 0) exit(0); // EOF
 	    parsed = libpostal_parse_address(lpbuffer,options);
         /* creates buffer and serializer instance. */
 
@@ -43,9 +43,10 @@ int main(int argc, char **argv) {
 
         // Free responses
 	    libpostal_address_parser_response_destroy(parsed);
-        fwrite(mpbuffer->data,mpbuffer->size, 1, stdout);
-        fflush(stdout);
+        
+        if (fwrite(mpbuffer->data,mpbuffer->size, 1, stdout) != 1) exit(0);
+        if (fflush(stdout) != 0) exit(0);
     }
-    msgpack_sbuffer_destroy(mpbuffer);
-    return 0;
+    // msgpack_sbuffer_destroy(mpbuffer);
+    // return 0;
 }
