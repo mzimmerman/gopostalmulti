@@ -12,28 +12,36 @@ import (
 	"github.com/vmihailenco/msgpack"
 )
 
-var pool = sync.Pool{
-	New: func() interface{} {
-		return request{
-			resp: make(chan [][2]string, 1),
-		}
-	},
-}
+// var pool = sync.Pool{
+// 	New: func() interface{} {
+// 		return request{
+// 			resp: make(chan [][2]string, 1),
+// 		}
+// 	},
+// }
 
-var kv = tinykv.New(time.Minute, nil)
+// var kv = tinykv.New(10*time.Minute, nil)
 
 type request struct {
 	address string
 	resp    chan [][2]string
 }
 
-var workers []chan request
+type Libpostal struct {
+	Path        string
+	MaxBackends int
+	pool        sync.Pool
+	kv          tinykv.KV
+	workers     []chan request
+}
 
-var path = "gopostalmultic"
+// var workers []chan request
+
+// var path = "./gopostalmultic"
 
 // start a new underlying OS process of "path" to process locations
-func startOne() {
-	cmd := exec.Command(path)
+func (l *Libpostal) startOne() {
+	cmd := exec.Command(l.Path)
 	writer, err := cmd.StdinPipe()
 	if err != nil {
 		log.Fatalf("Error getting writer pipe - %v", err)
@@ -47,7 +55,7 @@ func startOne() {
 		log.Fatalf("Unable to init gopostalmulti - %v", err)
 	}
 	reqChan := make(chan request)
-	workers = append(workers, reqChan)
+	l.workers = append(l.workers, reqChan)
 	go func() {
 		decoder := msgpack.NewDecoder(reader)
 		defer cmd.Wait()
@@ -65,35 +73,65 @@ func startOne() {
 }
 
 func init() { // serve one thread that is "native" through cgo
-	for x := 0; x < runtime.NumCPU(); x++ { // create a libpostal processor for each CPU
-		startOne()
+	// maxBackends := runtime.NumCPU() / 2
+	// if maxBackends < 0 {
+	// 	maxBackends = 1
+	// }
+	// 	for x := 0; x < runtime.NumCPU(); x++ { // create a libpostal processor for each CPU
+	// 		time.Sleep(100 * time.Millisecond)
+	// 		startOne()
+	// 	}
+}
+
+func (l *Libpostal) Init() {
+
+	if l.MaxBackends < 0 {
+		l.MaxBackends = runtime.NumCPU()
 	}
+	if l.Path == "" {
+		l.Path = "./gopostalmultic"
+	}
+	l.pool = sync.Pool{
+		New: func() interface{} {
+			return request{
+				resp: make(chan [][2]string, 1),
+			}
+		},
+	}
+	l.kv = tinykv.New(10*time.Minute, nil)
+	l.workers = make([]chan request, 0)
+
+	for x := 0; x < l.MaxBackends; x++ { // create a libpostal processor for each CPU
+		// time.Sleep(100 * time.Millisecond)
+		l.startOne()
+	}
+
 }
 
 // Parse will parse addresses and return postal components
 // can be called concurrently
-func Parse(address string) [][2]string {
-	resp, ok := kv.Get(address)
+func (l *Libpostal) Parse(address string) [][2]string {
+	resp, ok := l.kv.Get(address)
 	if ok {
 		return resp.([][2]string)
 	}
-	req := pool.Get().(request)
-	defer pool.Put(req)
+	req := l.pool.Get().(request)
+	defer l.pool.Put(req)
 	req.address = address
 	sentIt := false
 FindWorker:
-	for x := range workers {
+	for x := range l.workers {
 		select {
-		case workers[x] <- req:
+		case l.workers[x] <- req:
 			sentIt = true
 			break FindWorker // req was accepted!
 		default:
 		}
 	}
 	if !sentIt {
-		workers[rand.Intn(len(workers))] <- req
+		l.workers[rand.Intn(len(l.workers))] <- req
 	}
 	newresp := <-req.resp
-	kv.Put(address, newresp)
+	l.kv.Put(address, newresp)
 	return newresp
 }

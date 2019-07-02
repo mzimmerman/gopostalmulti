@@ -9,7 +9,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	log.Printf("%v", Parse("1265 East Fort Union Blvd., suite 250, Cotton Wood Hights, Utah 84047"))
+	log.Printf("%v", l.Parse("1265 East Fort Union Blvd., suite 250, Cotton Wood Hights, Utah 84047"))
 }
 
 var streets = []string{
@@ -518,12 +518,21 @@ var cities = []string{
 	"Bytom",
 }
 
+var  l =Libpostal{
+	MaxBackends: 2,
+}
+
+func init() {
+	/* load test data */
+	l.Init()
+}
+
 func benchmarkParse(numAddresses int, b *testing.B) {
 	addressIn := make(chan string, 1000)
 	for x := 0; x < runtime.NumCPU(); x++ {
 		go func() {
 			for add := range addressIn {
-				_ = Parse(add)
+				_ = l.Parse(add)
 			}
 		}()
 	}
