@@ -519,7 +519,7 @@ var cities = []string{
 }
 
 var l = Libpostal{
-	MaxBackends: 2,
+	MaxBackends: 0,
 }
 
 func init() {
