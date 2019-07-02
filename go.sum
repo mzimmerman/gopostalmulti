@@ -1,0 +1,8 @@
+github.com/dc0d/tinykv v4.0.1+incompatible h1:8IYVugvul3SzTn7mmmRBYnoH9PU9/hV6VQ+Wxr2iGk8=
+github.com/dc0d/tinykv v4.0.1+incompatible/go.mod h1:sHYeRvaBAQbjBfqlQ9iqGim67mHx5RtOdnKUxhi+9+Y=
+github.com/openvenues/gopostal v0.0.0-20171226154602-e0184512a45d h1:KJ+N55d9zLN8fTg3NchLdmmAmPieXC5E6UNJ8zFFttU=
+github.com/openvenues/gopostal v0.0.0-20171226154602-e0184512a45d/go.mod h1:Ycrd7XnwQdumHzpB/6WEa85B4WNdbLC6Wz4FAQNkaV0=
+github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
+github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/vmihailenco/msgpack v4.0.4+incompatible h1:dSLoQfGFAo3F6OoNhwUmLwVgaUXK79GlxNBwueZn0xI=
+github.com/vmihailenco/msgpack v4.0.4+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=
