@@ -518,7 +518,7 @@ var cities = []string{
 	"Bytom",
 }
 
-var  l =Libpostal{
+var l = Libpostal{
 	MaxBackends: 2,
 }
 
